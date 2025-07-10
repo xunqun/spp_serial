@@ -20,28 +20,14 @@ class _ServerScreenState extends State<ServerScreen> {
   late StreamSubscription<Uint8List>? _dataSub;
   late StreamSubscription<ServerConnectState> _connSub;
 
-  PacketServer dataReceiver = PacketServer.get();
   Image? image;
 
   @override
   void initState() {
     WakelockPlus.enable();
     super.initState();
-    dataReceiver.onComplete = (data) {
-      setState(() {
-        image = Image.memory(data);
-      });
-    };
-    _dataSub =SppHelper.get().serverReceivedDataStream.listen((data){
-      dataReceiver.handleIncomingPacket(data, (packets) async {
-        // send RESENT packet to client\
-        // for(int i = 0; i < packets.length; i++){
-        //   Channel.get().serverSendData(packets[i]);
-        //   await Future.delayed(Duration(milliseconds: 20));
-        // }
-      });
-    });
-    _connSub = SppHelper.get().serverConnectStateStream.listen(
+
+    _connSub = PacketServer.get().connectStateStream.listen(
       (state) {
         if (state == ServerConnectState.CONNECTED) {
           // Server started successfully

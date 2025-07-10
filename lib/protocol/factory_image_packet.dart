@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../model/packet.dart';
 import '../platform/spp_helper.dart';
 
-class ClientPacketFactory {
+class ImagePacketFactory {
 
 
   final Uint8List fileBytes;
@@ -13,30 +13,30 @@ class ClientPacketFactory {
   final List<List<int>> packets = [];
   final int fileId; // 目前未使用，預留
 
-  ClientPacketFactory._(this.fileId, this.fileBytes, this.postfix);
+  ImagePacketFactory._(this.fileId, this.fileBytes, this.postfix);
 
   /// 建立實例並切分封包
-  static Future<ClientPacketFactory> fromFile(int id, File file) async {
+  static Future<ImagePacketFactory> fromFile(int id, File file) async {
     final bytes = await file.readAsBytes();
     final postfix = file.path.split('.').last.toLowerCase();
-    final helper = ClientPacketFactory._(id, bytes, postfix);
+    final helper = ImagePacketFactory._(id, bytes, postfix);
     helper._buildPayload();
     return helper;
   }
 
   // final helper = await FilePacketHelper.fromAsset('assets/image/sample.jpg');
   // final packets = helper.getPackets();
-  static Future<ClientPacketFactory> fromAsset(int id, String assetPath) async {
+  static Future<ImagePacketFactory> fromAsset(int id, String assetPath) async {
     final bytes = await rootBundle.load(assetPath);
     final postfix = assetPath.split('.').last.toLowerCase();
     final data = bytes.buffer.asUint8List();
-    final helper = ClientPacketFactory._(id, data, postfix);
+    final helper = ImagePacketFactory._(id, data, postfix);
     helper._buildPayload();
     return helper;
   }
 
-  static Future<ClientPacketFactory> fromBytes(int id, List<int> data, String postfix) async {
-    final helper = ClientPacketFactory._(id, Uint8List.fromList(data), postfix);
+  static Future<ImagePacketFactory> fromBytes(int id, List<int> data, String postfix) async {
+    final helper = ImagePacketFactory._(id, Uint8List.fromList(data), postfix);
     helper._buildPayload();
     return helper;
   }

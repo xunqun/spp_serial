@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:spp_serial/model/connect_state.dart';
 import 'package:spp_serial/model/packet.dart';
-import 'package:spp_serial/protocol/factory_client_packet.dart';
+import 'package:spp_serial/protocol/factory_image_packet.dart';
 import 'package:spp_serial/protocol/packet_client.dart';
 import 'package:spp_serial/protocol/packet_server.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -20,7 +20,7 @@ class ConnectedClientScreen extends StatefulWidget {
 class _ConnectedClientScreenState extends State<ConnectedClientScreen> {
   late StreamSubscription? _dataSub;
   late StreamSubscription? _connSub;
-  PacketServer dataReceiver = PacketServer.get();
+  PacketClient dataReceiver = PacketClient.get();
   Image? image;
 
   @override

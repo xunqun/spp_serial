@@ -1,28 +1,21 @@
 import 'dart:async';
-import 'dart:collection';
-import 'dart:io';
 import 'dart:typed_data';
 
-import '../platform/spp_helper.dart';
-import '../protocol/factory_client_packet.dart';
-
 import '../model/connect_state.dart';
-import '../model/packet.dart';
+import '../platform/spp_helper.dart';
 import 'base_client.dart';
 
 class PacketClient with BaseClient{
+  static const List<int> header = [0xAA, 0x55];
+  static const int headerLength = 2;
+  static const int metaLength = 1 + 2 + 2; // type + index + length
+  static const int checksumLength = 2;
 
   /// Singleton instance of PacketServer
   static PacketClient? _instance;
 
-  /// Packets queue to hold the packets to be sent
-  Queue<List<int>> packets = Queue<List<int>>();
 
-  /// Timer to control the sending of packets
-  Timer? packetTimer;
-
-  /// Keep the file ID to file name mapping, this can be used to resend packets
-  Map<int, String> fileIdMap = HashMap<int, String>();
+  void Function(Uint8List imageData)? onComplete;
 
   // Data streams
   Stream<ClientConnectState> connectStateStream = SppHelper.get().clientConnectStateStream;
@@ -30,24 +23,25 @@ class PacketClient with BaseClient{
   Stream<bool> scanStateStream = SppHelper.get().scanStateStream;
   Stream<List<Map<String, String?>>> scanResultSteam = SppHelper.get().scanResultsStream;
 
+  int? totalSize;
+  int? totalChunks;
+  String postfix = '';
+  final Map<int, List<int>> receivedChunks = {};
+  final List<List<int>> resentPackets = [];
+  bool isEndReceived = false;
+  Uint8List incompleteBuffer = Uint8List(0);
+
   PacketClient._internal(){
-    // Initialize the timer for sending packets
-    packetTimer = Timer.periodic(Duration(milliseconds: packetInterval), (timer) {
-      if (packets.isNotEmpty) {
-        final packet = packets.removeFirst();
-        // Here you would send the packet to the client
-        // For example, using a method like sendPacket(packet);
-        SppHelper.get().sendData(packet);
-        print('Sending packet: ${packet.length} bytes');
-      }
-    });
 
     // Listen for incoming data
     SppHelper.get().clientReceivedDataStream.listen((data) {
       // Handle incoming data
       // You can process the data here or pass it to a handler
       print('Received data: ${data.length} bytes');
-      handleReceivedData(data);
+      handleIncomingPacket(data, (List<List<int>> resendPackets) async {
+        // Send the resent packets back to the server
+
+      });
     });
   }
 
@@ -57,32 +51,7 @@ class PacketClient with BaseClient{
     return _instance!;
   }
 
-  // Send internal asset file
-  @override
-  Future<void> sendAsset(String assetPath) async{
 
-    var id = genId();
-    var factory = await ClientPacketFactory.fromAsset(id, assetPath);
-    packets.addAll(factory.getPackets());
-    fileIdMap[id] = assetPath;
-  }
-
-  // Send file in the storage
-  @override
-  Future<void> sendFile(File file) async{
-    var id = genId();
-    var factory = await ClientPacketFactory.fromFile(id, file);
-    packets.addAll(factory.getPackets());
-    fileIdMap[id] = file.path;
-  }
-
-  @override
-  Future<void> sendBytes(List<int> data) async{
-    var id = genId();
-    var factory = await ClientPacketFactory.fromBytes(id, data, 'jpg');
-    packets.addAll(factory.getPackets());
-    fileIdMap[id] = '';
-  }
 
   @override
   void connect(String address){
@@ -109,33 +78,157 @@ class PacketClient with BaseClient{
     SppHelper.get().sendData(data);
   }
 
-  void handleReceivedData(Uint8List data) async{
-    // 處理重傳請求
-    final type = data[2];
-    final fileId = (data[3] << 8) | data[4];
-    final index = (data[5] << 8) | data[6];
+  void handleIncomingPacket(
+      Uint8List buffer, void Function(List<List<int>>) sendResendRequest) {
 
-    if (type == packetTypeToByte(PacketType.resendReq)) {
-      print('🔄 Resend request for index $index');
-      var file = fileIdMap[fileId]; // 儲存檔案ID與名稱的對應關係
-      if(file == null) return;
-      var isAsset = file.startsWith('assets/');
-      var factory = isAsset
-          ? await ClientPacketFactory.fromAsset(fileId, file)
-          : await ClientPacketFactory.fromFile(fileId, File(file));
+    incompleteBuffer = Uint8List.fromList(
+        incompleteBuffer.toList() + buffer.toList()); // 累積接收的資料
+    final headerIndex = _findHeaderIndex(incompleteBuffer);
+    if (headerIndex == -1) {
+      print('⚠️ No valid header found in the buffer');
+      return; // 沒有找到有效的 header
+    }
 
-      // 重新發送指定索引的封包
-      var packets = factory.getPackets();
-      if (index < packets.length) {
-        final resendPacket = packets[index];
-        // 這裡可以添加發送邏輯，例如通過通道發送
-        SppHelper.get().sendData(resendPacket);
-      } else {
-        print('❌ Invalid resend request for index $index');
+
+    // 從找到的 header 開始處理
+    buffer = incompleteBuffer.sublist(headerIndex);
+
+
+    // 驗證 header
+    if (buffer[0] != header[0] || buffer[1] != header[1]) return;
+
+    // 拆封
+    final type = buffer[2];
+    final fileId = (buffer[3] << 8) | buffer[4];
+    final index = (buffer[5] << 8) | buffer[6];
+    final length = (buffer[7] << 8) | buffer[8];
+    final dataStart = 9;
+    final dataEnd = dataStart + length;
+    final packetEnd = dataEnd + checksumLength;
+
+
+    buffer = buffer.sublist(0, packetEnd); // 確保只處理完整的封包
+    if (buffer.length < headerLength + metaLength + checksumLength) return;
+    incompleteBuffer = Uint8List.fromList(
+        buffer.sublist(packetEnd)); // 更新未完成的緩衝區
+
+    if (buffer.length < dataEnd + 2) {
+      print('⚠️ Packet too short: expected at least ${dataEnd + 2} bytes, got ${buffer.length}');
+      return; // 檢查長度完整
+    }
+
+    final data = buffer.sublist(dataStart, dataEnd);
+    final receivedChecksum = (buffer[dataEnd] << 8) | buffer[dataEnd + 1];
+
+    // 驗證 checksum
+    final crcInput = buffer.sublist(2, dataEnd);
+    if (_calculateChecksum16(Uint8List.fromList(crcInput)) !=
+        receivedChecksum) {
+      print('❌ checksum error at index $index');
+      var resentPacket = buildResetPacket(fileId, index);
+      resentPackets.add(resentPacket);
+
+      sendResendRequest(resentPackets);
+      return;
+    }
+
+    if (type == 0x01) {
+      // START
+      if (data.length >= 8) {
+        totalSize = ByteData.sublistView(Uint8List.fromList(data), 0, 4)
+            .getUint32(0, Endian.big);
+        totalChunks = ByteData.sublistView(Uint8List.fromList(data), 4, 8)
+            .getUint32(0, Endian.big);
+        postfix = String.fromCharCodes(data.sublist(8, 12));
+        receivedChunks.clear();
+        print('✅ START received: totalSize=$totalSize, chunks=$totalChunks, postfix="$postfix"');
+      }
+    } else if (type == 0x02) {
+      // DATA
+      if (!receivedChunks.containsKey(index)) {
+        receivedChunks[index] = data;
+        print('📦 DATA $index received (${data.length} bytes)');
+      }
+    } else if (type == 0x03) {
+      // END
+      isEndReceived = true;
+      print('✅ END received');
+      _checkCompletion(fileId, sendResendRequest);
+    } else {
+      print('⚠️ Unknown packet type: $type at index $index');
+    }
+  }
+
+  int _findHeaderIndex(Uint8List buffer) {
+    for (int i = 0; i < buffer.length - headerLength; i++) {
+      if (buffer[i] == header[0] && buffer[i + 1] == header[1]) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  void _checkCompletion(int fileId, void Function(List<List<int>>) sendResendRequest) {
+    if (totalChunks == null || !isEndReceived) return;
+
+    final missing = <int>[];
+    for (int i = 0; i < totalChunks!; i++) {
+      if (!receivedChunks.containsKey(i)) {
+        missing.add(i);
+      }
+    }
+
+    if (missing.isEmpty) {
+      print('🎉 檔案接收完成，總大小: ${_rebuildFile().length} bytes');
+      final data = _rebuildFile();
+      if (onComplete != null) {
+        onComplete!(data);
+      }
+    } else {
+      print('⚠️ 發現遺失封包: ${missing.length} 個 → $missing');
+      for (final index in missing) {
+        resentPackets.add(buildResetPacket(fileId, index));
       }
 
-    } else {
-      print('⚠️ Unknown resend request type: $type');
+      // if 發送重送請求
+      sendResendRequest(resentPackets);
     }
+  }
+
+  /// 重組整個檔案內容
+  Uint8List _rebuildFile() {
+    final sorted =
+    List.generate(receivedChunks.length, (i) => receivedChunks[i] ?? [])
+        .expand((e) => e)
+        .toList();
+    return Uint8List.fromList(sorted);
+  }
+
+  int _calculateChecksum16(Uint8List data) {
+    int sum = 0;
+    for (final b in data) {
+      sum += b;
+    }
+    return sum & 0xFFFF;
+  }
+
+  List<int> buildResetPacket(int id, int index) {
+    var data = [(index >> 8) & 0xFF, index & 0xFF];
+    final packet = <int>[
+      header[0], header[1], // Header
+      0x05, // Type: Resend Request
+      (id >> 8) & 0xFF, (id & 0xFF), // File ID
+      (index >> 8) & 0xFF, (index & 0xFF), // Index
+      0x00, 0x04, // Length: 2 bytes (for index)
+    ];
+    packet.addAll(data);
+    // 計算 checksum
+
+    final checksum =
+    _calculateChecksum16(Uint8List.fromList(packet.sublist(2)));
+    packet.add((checksum >> 8) & 0xFF);
+    packet.add(checksum & 0xFF);
+
+    return Uint8List.fromList(packet);
   }
 }
