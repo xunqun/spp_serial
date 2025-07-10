@@ -55,6 +55,12 @@ class PacketServer with BaseServer {
   bool isEndReceived = false;
   Uint8List incompleteBuffer = Uint8List(0);
 
+  @override
+  Future<void> startServer() => SppHelper.get().connectAsServer();
+
+  @override
+  Future<void> stopServer() => SppHelper.get().serverStop();
+
   // Send internal asset file
   @override
   Future<void> sendAsset(String assetPath) async{

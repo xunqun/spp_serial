@@ -18,6 +18,10 @@ mixin BaseServer{
     return accumulatedFileId;
   }
 
+  Future<void> startServer();
+
+  Future<void> stopServer();
+
   Future<void> sendAsset(String assetPath);
 
   Future<void> sendFile(File file);

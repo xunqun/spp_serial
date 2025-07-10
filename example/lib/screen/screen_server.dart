@@ -40,7 +40,7 @@ class _ServerScreenState extends State<ServerScreen> {
   @override
   void dispose() {
     WakelockPlus.disable();
-    SppHelper.get().serverStop();
+    PacketServer.get().stopServer();
     _dataSub?.cancel();
     _connSub.cancel();
     super.dispose();
@@ -60,7 +60,7 @@ class _ServerScreenState extends State<ServerScreen> {
             mainAxisAlignment: MainAxisAlignment.start,
             children: <Widget>[
               StreamBuilder(
-                  stream: SppHelper.get().serverConnectStateStream,
+                  stream: PacketServer.get().connectStateStream,
                   initialData: ServerConnectState.STOPPED,
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
@@ -77,7 +77,7 @@ class _ServerScreenState extends State<ServerScreen> {
                     }
                   }),
               StreamBuilder(
-                  stream: SppHelper.get().serverConnectStateStream,
+                  stream: PacketServer.get().connectStateStream,
                   initialData: ServerConnectState.STOPPED,
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
@@ -87,7 +87,7 @@ class _ServerScreenState extends State<ServerScreen> {
                           onPressed: () {
                             // Add your server-specific functionality here
                             // For example, start listening for connections
-                            SppHelper.get().connectAsServer();
+                            PacketServer.get().startServer();
                           },
                           child: const Text('Start Server'),
                         );
@@ -101,7 +101,7 @@ class _ServerScreenState extends State<ServerScreen> {
                           onPressed: () {
                             // Add your server-specific functionality here
                             // For example, stop the server
-                            SppHelper.get().serverStop();
+                            PacketServer.get().stopServer();
                           },
                           child: const Text('Stop Server'),
                         );
@@ -110,7 +110,7 @@ class _ServerScreenState extends State<ServerScreen> {
                     return const SizedBox.shrink();
                   }),
               StreamBuilder(
-                  stream: SppHelper.get().serverReceivedDataStream,
+                  stream: PacketServer.get().dataStream,
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
                       Uint8List? data = snapshot.data;
