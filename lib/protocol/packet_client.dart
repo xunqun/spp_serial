@@ -8,7 +8,7 @@ import '../protocol/factory_client_packet.dart';
 
 import '../model/connect_state.dart';
 import '../model/packet.dart';
-import 'BaseClient.dart';
+import 'base_client.dart';
 
 class PacketClient with BaseClient{
 

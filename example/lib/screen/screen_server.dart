@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:spp_serial/model/connect_state.dart';
 import 'package:spp_serial/platform/spp_helper.dart';
 import 'package:spp_serial/protocol/packet_server.dart';
+import 'package:spp_serial_example/screen/screen_connected_server.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ServerScreen extends StatefulWidget {
@@ -15,7 +17,10 @@ class ServerScreen extends StatefulWidget {
 
 class _ServerScreenState extends State<ServerScreen> {
 
-  PacketServer dataReceiver = PacketServer();
+  late StreamSubscription<Uint8List>? _dataSub;
+  late StreamSubscription<ServerConnectState> _connSub;
+
+  PacketServer dataReceiver = PacketServer.get();
   Image? image;
 
   @override
@@ -27,7 +32,7 @@ class _ServerScreenState extends State<ServerScreen> {
         image = Image.memory(data);
       });
     };
-    SppHelper.get().serverReceivedDataStream.listen((data){
+    _dataSub =SppHelper.get().serverReceivedDataStream.listen((data){
       dataReceiver.handleIncomingPacket(data, (packets) async {
         // send RESENT packet to client\
         // for(int i = 0; i < packets.length; i++){
@@ -36,12 +41,22 @@ class _ServerScreenState extends State<ServerScreen> {
         // }
       });
     });
+    _connSub = SppHelper.get().serverConnectStateStream.listen(
+      (state) {
+        if (state == ServerConnectState.CONNECTED) {
+          // Server started successfully
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ConnectedServerScreen()));
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
     SppHelper.get().serverStop();
+    _dataSub?.cancel();
+    _connSub.cancel();
     super.dispose();
   }
 

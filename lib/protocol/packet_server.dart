@@ -1,10 +1,28 @@
 import 'dart:typed_data';
 
+import '../model/connect_state.dart';
+import '../platform/spp_helper.dart';
+
 class PacketServer {
+  /// Singleton instance of PacketServer
+  static PacketServer? _instance;
+  static PacketServer get() {
+    _instance ??= PacketServer._internal();
+    return _instance!;
+  }
+
+  PacketServer._internal(){
+
+  }
+
   static const List<int> header = [0xAA, 0x55];
   static const int headerLength = 2;
   static const int metaLength = 1 + 2 + 2; // type + index + length
   static const int checksumLength = 2;
+
+  // Data streams
+  Stream<ServerConnectState> connectStateStream = SppHelper.get().serverConnectStateStream;
+  Stream<Uint8List> dataStream = SppHelper.get().serverReceivedDataStream;
 
   int? totalSize;
   int? totalChunks;
@@ -166,5 +184,22 @@ class PacketServer {
     packet.add(checksum & 0xFF);
 
     return Uint8List.fromList(packet);
+  }
+
+  void disconnect(){
+    SppHelper.get().serverStop();
+    receivedChunks.clear();
+    isEndReceived = false;
+    totalSize = null;
+    totalChunks = null;
+    postfix = '';
+    incompleteBuffer = Uint8List(0);
+    resentPackets.clear();
+    onComplete = null;
+  }
+
+  sendData(List<int> packet) {
+    if (packet.isEmpty) return;
+    SppHelper.get().serverSendData(packet);
   }
 }
