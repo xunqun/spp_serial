@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-int packetSize = 900;
-int packetInterval = 30; // milliseconds
+int packetSize = 960;
+int packetInterval = 40; // milliseconds
 const int headerSize = 2 + 1 + 2 + 2 + 2; // AA55 + TYPE + INDEX + LENGTH + CRC16
 const List<int> headerBytes = [0xAA, 0x55];
 

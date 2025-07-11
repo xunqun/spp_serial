@@ -55,6 +55,16 @@ class PacketServer with BaseServer {
   bool isEndReceived = false;
   Uint8List incompleteBuffer = Uint8List(0);
 
+  void addPacket(List<List<int>> packet) {
+    if (packet.isEmpty) return;
+
+    // Avoid queuing too many packets
+    if(packets.length > 1) {
+      packets.clear();
+    }
+    packets.addAll(packet);
+  }
+
   @override
   Future<void> startServer() => SppHelper.get().connectAsServer();
 
@@ -67,7 +77,7 @@ class PacketServer with BaseServer {
 
     var id = genId();
     var factory = await ImagePacketFactory.fromAsset(id, assetPath);
-    packets.addAll(factory.getPackets());
+    addPacket(factory.getPackets());
     fileIdMap[id] = assetPath;
   }
 
@@ -76,7 +86,7 @@ class PacketServer with BaseServer {
   Future<void> sendFile(file) async{
     var id = genId();
     var factory = await ImagePacketFactory.fromFile(id, file);
-    packets.addAll(factory.getPackets());
+    addPacket(factory.getPackets());
     fileIdMap[id] = file.path;
   }
 
@@ -84,7 +94,7 @@ class PacketServer with BaseServer {
   Future<void> sendBytes(List<int> data) async{
     var id = genId();
     var factory = await ImagePacketFactory.fromBytes(id, data, 'jpg');
-    packets.addAll(factory.getPackets());
+    addPacket(factory.getPackets());
     fileIdMap[id] = '';
   }
 
