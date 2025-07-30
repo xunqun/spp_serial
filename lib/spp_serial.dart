@@ -25,8 +25,8 @@ class SppSerial {
     return SppSerialPlatform.instance.connectAsClient(deviceId);
   }
 
-  Future<void> connectAsServer() {
-    return SppSerialPlatform.instance.connectAsServer();
+  Future<void> connectAsServer(bool discoverable) {
+    return SppSerialPlatform.instance.connectAsServer(discoverable);
   }
 
   Future<void> serverStop() {

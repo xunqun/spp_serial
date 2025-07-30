@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:spp_serial/model/connect_state.dart';
 import 'package:spp_serial/protocol/packet_client.dart';
@@ -15,17 +17,19 @@ class ClientScreen extends StatefulWidget {
 
 class _ClientScreenState extends State<ClientScreen> {
   bool isScanning = false;
+  StreamSubscription<bool>? _scanSub;
+  StreamSubscription<ClientConnectState>? _connSub;
 
   @override
   void initState() {
     super.initState();
-    PacketClient.get().scanStateStream.listen((scanning) {
+    _scanSub =PacketClient.get().scanStateStream.listen((scanning) {
       setState(() {
         isScanning = scanning;
       });
     });
 
-    PacketClient.get().connectStateStream.listen((connectState) {
+    _connSub = PacketClient.get().connectStateStream.listen((connectState) {
       if (connectState == ClientConnectState.CONNECTED) {
         // Navigate to the connected client screen
         Navigator.push(context, MaterialPageRoute(builder: (context) => const ConnectedClientScreen()));
@@ -39,6 +43,8 @@ class _ClientScreenState extends State<ClientScreen> {
 
   @override
   void dispose() {
+    _scanSub?.cancel();
+    _connSub?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -80,17 +86,19 @@ class _ClientScreenState extends State<ClientScreen> {
                     return const Center(child: Text('No devices found'));
                   }
                   final devices = snapshot.data!;
+                  var validDevices = findCandidateDevices(devices);
                   return ListView.builder(itemBuilder: (context, index) {
                     // Replace with your device list
+                    var name  = validDevices[index]['name'] == null || validDevices[index]['name'] == '' ? 'NoName Device' : validDevices[index]['name'];
                     return ListTile(
-                      title: Text(devices[index]['name'] ?? 'Unknown Device'),
-                      subtitle: Text(devices[index]['type'] ?? ''),
+                      title: Text(name),
+                      trailing: Text(validDevices[index]['type'] ?? ''),
                       onTap: () {
                         // Handle device selection
-                        PacketClient.get().connect(devices[index]['address'] ?? '');
+                        PacketClient.get().connect(validDevices[index]['address'] ?? '');
                       },
                     );
-                  }, itemCount: devices.length,);
+                  }, itemCount: validDevices.length,);
                 }
               )),
             ],
@@ -98,5 +106,21 @@ class _ClientScreenState extends State<ClientScreen> {
         ),
       ),
     );
+  }
+
+  findCandidateDevices(List<Map<String, String?>> devices) {
+    // fileter out device's UUIDs contains SERVICE_UUID
+    // const SERVICE_UUID = '00001101-0000-1000-8000-00805F9B34FB';
+    // return devices.where((device) {
+    //   final uuids = device['uuids']?.split(',') ?? [];
+    //   return uuids.any((uuid) => uuid.toLowerCase() == SERVICE_UUID.toLowerCase());
+    // }).toList();
+
+    // fileter out devices that are no name
+    devices = devices.where((device) {
+      final name = device['name']?.trim() ?? '';
+      return name.isNotEmpty && name != 'NoName Device';
+    }).toList();
+    return devices;
   }
 }

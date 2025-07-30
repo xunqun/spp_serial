@@ -104,9 +104,9 @@ class SppHelper {
     }
   }
 
-  Future<void> connectAsServer() async {
+  Future<void> connectAsServer(bool discoverable) async {
     try {
-      await platform.connectAsServer();
+      await platform.connectAsServer(discoverable);
     } on PlatformException catch (e) {
       print("Failed to connect as server: '${e.message}'.");
     }

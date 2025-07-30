@@ -18,7 +18,7 @@ mixin BaseServer{
     return accumulatedFileId;
   }
 
-  Future<void> startServer();
+  Future<void> startServer({bool isAdvertise = true});
 
   Future<void> stopServer();
 

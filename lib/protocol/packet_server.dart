@@ -66,7 +66,7 @@ class PacketServer with BaseServer {
   }
 
   @override
-  Future<void> startServer() => SppHelper.get().connectAsServer();
+  Future<void> startServer({bool isAdvertise = true}) => SppHelper.get().connectAsServer(isAdvertise);
 
   @override
   Future<void> stopServer() => SppHelper.get().serverStop();

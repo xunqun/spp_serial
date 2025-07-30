@@ -46,7 +46,7 @@ abstract class SppSerialPlatform extends PlatformInterface {
     throw UnimplementedError('connectAsClient() has not been implemented.');
   }
 
-  Future<void> connectAsServer() {
+  Future<void> connectAsServer(bool discoverable) {
     throw UnimplementedError('connectAsServer() has not been implemented.');
   }
 

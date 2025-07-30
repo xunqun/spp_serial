@@ -50,14 +50,15 @@ class SppSerialPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)!!
         // Do something with the discovered device
         var map = hashMapOf<String, String>(
-          "name" to device.name,
-          "address" to device.address,
+          "name" to (device.name ?: ""),
+          "address" to (device.address ?: ""),
           "type" to when (device.type) {
             BluetoothDevice.DEVICE_TYPE_CLASSIC -> "Classic"
             BluetoothDevice.DEVICE_TYPE_LE -> "LE"
             BluetoothDevice.DEVICE_TYPE_DUAL -> "Dual"
             else -> "Unknown"
-          }
+          },
+          "uuids" to (device.uuids?.joinToString(",") { it.toString() } ?: "")
         )
         discoveredDevices.add(map);
         sendScanResults(discoveredDevices)
@@ -70,6 +71,7 @@ class SppSerialPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED == action) {
         // Discovery has started
         discoveredDevices.clear() // Clear previous scan results
+        sendScanResults(discoveredDevices)
         ClientManager.get()._scanStateLive.postValue(true)
         sendClientScanState(true)
       }
@@ -136,18 +138,21 @@ class SppSerialPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       }
       "connectAsServer" -> {
         imServer = true
+        val discoverable = call.argument<Boolean>("discoverable") ?: false
         val manager = bluetoothManager ?: activity!!.getSystemService(BluetoothManager::class.java)
         val adapter = manager.adapter
         if (adapter?.isEnabled == false) {
           val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
           activity!!.startActivityForResult(enableBtIntent, 1)
         } else {
-          val requestCode = 1
-          val discoverableIntent =
-            Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-              putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-            }
-          activity!!.startActivityForResult(discoverableIntent, requestCode)
+          if(discoverable) {
+            val requestCode = 1
+            val discoverableIntent =
+              Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+              }
+            activity!!.startActivityForResult(discoverableIntent, requestCode)
+          }
           ServerManager.get().startServer()
           result.success(null)
         }

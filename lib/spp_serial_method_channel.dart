@@ -36,8 +36,8 @@ class MethodChannelSppSerial extends SppSerialPlatform {
   }
 
   @override
-  Future<void> connectAsServer() async {
-    await methodChannel.invokeMethod('connectAsServer');
+  Future<void> connectAsServer(bool discoverable) async {
+    await methodChannel.invokeMethod('connectAsServer', {'discoverable': discoverable});
   }
 
   @override
