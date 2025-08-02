@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:spp_serial/model/connect_state.dart';
 import 'package:spp_serial/protocol/packet_client.dart';
+import 'package:spp_serial_example/utils/preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 
@@ -50,6 +51,7 @@ class _ClientScreenState extends State<ClientScreen> {
   }
   @override
   Widget build(BuildContext context) {
+    String lastDeviceId = Preferences.get().lastDeviceId;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Client Screen'),
@@ -65,6 +67,9 @@ class _ClientScreenState extends State<ClientScreen> {
               const Text(
                 'This is the client screen.',
               ),
+              if(lastDeviceId.isNotEmpty) ElevatedButton(onPressed: (){
+                PacketClient.get().connect(lastDeviceId);
+              }, child: Text("try last device")),
               ElevatedButton(
                 onPressed: () {
                   // Add your client-specific functionality here
@@ -95,7 +100,9 @@ class _ClientScreenState extends State<ClientScreen> {
                       trailing: Text(validDevices[index]['type'] ?? ''),
                       onTap: () {
                         // Handle device selection
-                        PacketClient.get().connect(validDevices[index]['address'] ?? '');
+                        var address = validDevices[index]['address'];
+                        PacketClient.get().connect(address);
+                        Preferences.get().lastDeviceId = address;
                       },
                     );
                   }, itemCount: validDevices.length,);

@@ -4,6 +4,8 @@ import '../screen/screen_server.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'utils/preferences.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -62,6 +64,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
+    Preferences.get();
     WakelockPlus.enable();
     super.initState();
   }

@@ -87,7 +87,7 @@ class _ServerScreenState extends State<ServerScreen> {
                           onPressed: () {
                             // Add your server-specific functionality here
                             // For example, start listening for connections
-                            PacketServer.get().startServer(true);
+                            PacketServer.get().startServer(isAdvertise: true);
                           },
                           child: const Text('Start Server'),
                         );
