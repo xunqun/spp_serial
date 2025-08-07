@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:spp_serial/spp_serial.dart';
 import '../model/connect_state.dart';
+import 'base_helper.dart';
 
-class SppHelper {
+class SppHelper with BaseHelper {
+
+  static SppSerial platform = SppSerial();
+
   // Singleton pattern to ensure only one instance of Channel exists
   static SppHelper? _instance;
   static SppHelper get() {
@@ -15,26 +19,6 @@ class SppHelper {
     }
     return _instance!;
   }
-
-  // static const platform = MethodChannel('channel.whiles.app/bluetooth');
-  static SppSerial platform = SppSerial();
-  StreamController<List<Map<String, String?>>> _scanResultsController = StreamController<List<Map<String, String?>>>.broadcast();
-  Stream<List<Map<String, String?>>> get scanResultsStream => _scanResultsController.stream;
-
-  StreamController<bool> _scanStateController = StreamController<bool>.broadcast();
-  Stream<bool> get scanStateStream => _scanStateController.stream;
-
-  StreamController<ClientConnectState> _clientConnectStateController = StreamController<ClientConnectState>.broadcast();
-  Stream<ClientConnectState> get clientConnectStateStream => _clientConnectStateController.stream;
-
-  StreamController<ServerConnectState> _serverConnectStateController = StreamController<ServerConnectState>.broadcast();
-  Stream<ServerConnectState> get serverConnectStateStream => _serverConnectStateController.stream;
-
-  StreamController<Uint8List> _serverReceivedDataController = StreamController<Uint8List>.broadcast();
-  Stream<Uint8List> get serverReceivedDataStream => _serverReceivedDataController.stream;
-
-  StreamController<Uint8List> _clientReceivedDataController = StreamController<Uint8List>.broadcast();
-  Stream<Uint8List> get clientReceivedDataStream => _clientReceivedDataController.stream;
 
 
   _internal(){
@@ -47,39 +31,40 @@ class SppHelper {
               .whereType<Map>() // 过滤出 Map 类型
               .map((e) => Map<String, String?>.from(e as Map)) // 转换为 Map<String, String>
               .toList();
-          _scanResultsController.add(list);
+          scanResultsController.add(list);
           break;
         case 'clientScanState':
           // Handle scan state changes
           final bool isScanning = call.arguments;
-          _scanStateController.add(isScanning);
+          scanStateController.add(isScanning);
           break;
         case 'clientConnectState':
           // Handle connection state changes
           final String connectState = call.arguments;
-          _clientConnectStateController.add(ClientConnectState.findByName(connectState));
+          clientConnectStateController.add(ClientConnectState.findByName(connectState));
           break;
         case 'serverConnectState':
           // Handle server connection state changes
           final String serverConnectState = call.arguments;
-          _serverConnectStateController.add(ServerConnectState.findByName(serverConnectState));
+          serverConnectStateController.add(ServerConnectState.findByName(serverConnectState));
           break;
         case 'serverReceivedData':
           // Handle received data from server
           final Uint8List data = call.arguments;
           debugPrint("Server received data:");
-          _serverReceivedDataController.add(data);
+          serverReceivedDataController.add(data);
           break;
         case 'clientReceivedData':
           // Handle received data from client
           final Uint8List data = call.arguments;
           // print("Client received data: $data");
-          _clientReceivedDataController.add(data);
+          clientReceivedDataController.add(data);
           break;
       }
     });
   }
 
+  @override
   Future<void> scan() async {
     try {
       await platform.scan();
@@ -88,6 +73,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> stopScan() async {
     try {
       await platform.stopScan();
@@ -96,6 +82,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> connectAsClient(String deviceId) async {
     try {
       await platform.connectAsClient(deviceId);
@@ -104,6 +91,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> connectAsServer(bool discoverable) async {
     try {
       await platform.connectAsServer(discoverable);
@@ -112,6 +100,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> serverStop() async {
     try {
       await platform.serverStop();
@@ -120,6 +109,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> clientDisconnect() async {
     try {
       await platform.disconnect();
@@ -128,6 +118,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> sendData(List<int> data) async {
     try {
       Uint8List uint8list = Uint8List.fromList(data);
@@ -137,6 +128,7 @@ class SppHelper {
     }
   }
 
+  @override
   Future<void> serverSendData(List<int> data) async {
     try {
       Uint8List uint8list = Uint8List.fromList(data);
